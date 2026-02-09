@@ -1,0 +1,21 @@
+# PDFs (large, copyrighted)
+*.pdf
+
+# API keys and secrets
+fetch_images.py
+
+# Cache and temp files
+ai_query_cache.json
+image_cache/
+_debug*
+run_log.txt
+run_err.txt
+nul
+
+# Claude config
+.claude/
+
+# Alchemical dictionary (separate project)
+alchemical_dictionary.html
+alchemical_dictionary.json
+alchemical_images.json
