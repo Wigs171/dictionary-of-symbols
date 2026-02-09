@@ -454,6 +454,11 @@ main {{
     overflow-y: auto;
 }}
 
+.quiz-redacted {{
+    color: var(--accent);
+    letter-spacing: 0.05em;
+}}
+
 .quiz-options {{
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -916,6 +921,7 @@ let currentLetter = null;
 let quizCorrect = 0;
 let quizTotal = 0;
 let quizUsed = new Set();
+let currentQuizEntry = null;
 
 // Only entries with definitions (not cross-references) for quiz
 const quizEntries = ENTRIES.filter(e => !e.is_cross_ref && e.definition.length > 50);
@@ -949,6 +955,46 @@ function processDefinition(text) {{
 
 function slugify(text) {{
     return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}}
+
+// ============================================================
+// QUIZ TERM REDACTION
+// ============================================================
+function redactTermFromDefinition(text, term) {{
+    if (!term || !text) return text;
+
+    const escapeRegex = (s) => s.replace(/[.*+?^${{}}()|[\\]\\\\]/g, '\\\\$&');
+
+    const patterns = [];
+
+    // Full term pattern (flexible whitespace for multi-word)
+    const fullPattern = escapeRegex(term).replace(/\\s+/g, '\\\\s+');
+    patterns.push(fullPattern);
+
+    // For multi-word terms, also redact individual words >= 4 chars
+    const words = term.split(/\\s+/);
+    if (words.length > 1) {{
+        words.forEach(w => {{
+            if (w.length >= 4) {{
+                patterns.push(escapeRegex(w));
+            }}
+        }});
+    }}
+
+    // Sort longest-first, add suffix variants for plurals/possessives
+    patterns.sort((a, b) => b.length - a.length);
+    const suffixed = patterns.map(p => p + "(?:e?s)?(?:'s|s')?");
+    const combined = '\\\\b(?:' + suffixed.join('|') + ')\\\\b';
+    const regex = new RegExp(combined, 'gi');
+
+    return text.replace(regex, '\\u2588\\u2588\\u2588\\u2588\\u2588\\u2588');
+}}
+
+function processDefinitionForQuiz(text, term) {{
+    const redacted = redactTermFromDefinition(text, term);
+    let html = processDefinition(redacted);
+    html = html.replace(/\\u2588{{6}}/g, '<span class="quiz-redacted">\\u2588\\u2588\\u2588\\u2588\\u2588\\u2588</span>');
+    return html;
 }}
 
 // ============================================================
@@ -1116,7 +1162,8 @@ function nextQuestion() {{
     }}
 
     // Show definition
-    document.getElementById('quiz-definition').innerHTML = processDefinition(correct.definition);
+    currentQuizEntry = correct;
+    document.getElementById('quiz-definition').innerHTML = processDefinitionForQuiz(correct.definition, correct.term);
 
     // Show options
     const optionsDiv = document.getElementById('quiz-options');
@@ -1156,6 +1203,12 @@ function checkAnswer(btn, selected, correct) {{
     }}
 
     updateQuizScore();
+
+    // Un-redact the definition now that the answer is revealed
+    if (currentQuizEntry) {{
+        document.getElementById('quiz-definition').innerHTML = processDefinition(currentQuizEntry.definition);
+    }}
+
     document.getElementById('quiz-next').style.display = 'inline-block';
 }}
 
